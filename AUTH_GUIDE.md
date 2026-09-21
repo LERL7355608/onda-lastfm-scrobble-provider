@@ -1,10 +1,11 @@
 # Last.fm authorization
 
-The plugin needs three protected values:
+The plugin needs three protected values, but only the first two are entered
+manually:
 
 - `api_key`: identifies the Last.fm API application.
 - `shared_secret`: signs authenticated API requests.
-- `session_key`: grants that application access to the Last.fm user account.
+- `session_key`: generated automatically after the user authorizes ONDA.
 
 The official desktop flow is:
 
@@ -16,5 +17,6 @@ The official desktop flow is:
 The authorization token expires and is single-use. The session key normally
 remains valid until the user revokes application access.
 
+Use **Conectar con Last.fm** in the plugin configuration to run these steps.
 Never put any of these values in `plugin.json`, source control, screenshots or
 bug reports.

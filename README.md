@@ -10,10 +10,11 @@ user session:
 
 1. Create or open an API account at `https://www.last.fm/api/account/create`.
 2. Obtain its API key and shared secret.
-3. Complete Last.fm's desktop authentication flow to obtain a session key.
-4. Install the `.meb`, enter all three values in ONDA and press **Probar**.
+3. Install the `.meb` and enter the API key and shared secret in ONDA.
+4. Press **Conectar con Last.fm**, authorize ONDA and return to the app.
 
-ONDA encrypts the three values in plugin-isolated storage. The provider never
+ONDA obtains the session key automatically and encrypts all three values in
+plugin-isolated storage. The provider never
 stores or logs them. The plugin deliberately does not request a Last.fm password.
 
 ## Build

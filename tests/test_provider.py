@@ -73,6 +73,24 @@ class ProviderTests(unittest.TestCase):
         self.assertEqual(value, "985cc7968ee83542766bbab28f6d8105")
 
     @patch("provider.requests.post")
+    def test_browser_authentication_stores_returned_session(self, post):
+        post.side_effect = [
+            Response({"token": "temporary"}),
+            Response({"session": {"name": "listener", "key": "new-session"}}),
+        ]
+        provider = Provider(Context({"api_key": "api", "shared_secret": "secret"}))
+
+        request = asyncio.run(provider.begin_authentication())
+        result = asyncio.run(provider.complete_authentication())
+
+        self.assertIn("api_key=api", request["authorization_url"])
+        self.assertIn("token=temporary", request["authorization_url"])
+        self.assertEqual(result["secrets"], {"session_key": "new-session"})
+        self.assertEqual(result["details"]["usuario"], "listener")
+        self.assertEqual(post.call_args_list[0].kwargs["data"]["method"], "auth.getToken")
+        self.assertEqual(post.call_args_list[1].kwargs["data"]["method"], "auth.getSession")
+
+    @patch("provider.requests.post")
     def test_configuration_checks_authenticated_user(self, post):
         post.return_value = Response({"user": {"name": "listener"}})
         result = asyncio.run(Provider(context()).check_configuration())

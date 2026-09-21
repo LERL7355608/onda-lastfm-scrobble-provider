@@ -4,6 +4,7 @@ import asyncio
 import hashlib
 from datetime import datetime, timezone
 from typing import Any
+from urllib.parse import urlencode
 
 import requests
 
@@ -11,12 +12,70 @@ from onda_provider_sdk import ProviderError, ScrobbleProvider, Track
 
 
 API_URL = "https://ws.audioscrobbler.com/2.0/"
+AUTH_URL = "https://www.last.fm/api/auth/"
 REQUEST_TIMEOUT = (10, 20)
 
 
 class Provider(ScrobbleProvider):
     def __init__(self, context: Any) -> None:
         self.context = context
+        self._pending_token: str | None = None
+
+    async def begin_authentication(self) -> dict[str, Any]:
+        api_key, shared_secret = self._app_credentials()
+        payload = await self._signed_call(
+            "auth.getToken",
+            {},
+            api_key=api_key,
+            shared_secret=shared_secret,
+        )
+        token = str(payload.get("token", "")).strip()
+        if not token:
+            raise ProviderError(
+                "AUTH_RESPONSE_INVALID",
+                "Last.fm no devolvió un token de autorización.",
+            )
+        self._pending_token = token
+        return {
+            "authorization_url": f"{AUTH_URL}?{urlencode({'api_key': api_key, 'token': token})}",
+            "message": "Autoriza ONDA en Last.fm y vuelve a la aplicación.",
+        }
+
+    async def complete_authentication(self) -> dict[str, Any]:
+        token = self._pending_token
+        if not token:
+            raise ProviderError(
+                "AUTH_NOT_STARTED",
+                "Inicia de nuevo la autorización de Last.fm.",
+            )
+        api_key, shared_secret = self._app_credentials()
+        try:
+            payload = await self._signed_call(
+                "auth.getSession",
+                {"token": token},
+                api_key=api_key,
+                shared_secret=shared_secret,
+            )
+        finally:
+            self._pending_token = None
+        session = payload.get("session") if isinstance(payload, dict) else None
+        if not isinstance(session, dict):
+            raise ProviderError(
+                "AUTH_RESPONSE_INVALID",
+                "Last.fm no devolvió una sesión válida.",
+            )
+        session_key = str(session.get("key", "")).strip()
+        username = str(session.get("name", "")).strip()
+        if not session_key:
+            raise ProviderError(
+                "AUTH_RESPONSE_INVALID",
+                "Last.fm devolvió una sesión vacía.",
+            )
+        return {
+            "secrets": {"session_key": session_key},
+            "message": "Cuenta de Last.fm conectada.",
+            "details": {"usuario": username} if username else {},
+        }
 
     async def check_configuration(self) -> dict[str, Any]:
         missing = self._missing_credentials()
@@ -45,15 +104,41 @@ class Provider(ScrobbleProvider):
 
     async def _call(self, method: str, params: dict[str, str]) -> dict[str, Any]:
         api_key, shared_secret, session_key = self._credentials()
+        return await self._signed_call(
+            method,
+            {"sk": session_key, **params},
+            api_key=api_key,
+            shared_secret=shared_secret,
+        )
+
+    async def _signed_call(
+        self,
+        method: str,
+        params: dict[str, str],
+        *,
+        api_key: str,
+        shared_secret: str,
+    ) -> dict[str, Any]:
         signed = {
             "api_key": api_key,
             "method": method,
-            "sk": session_key,
             **params,
         }
         signed["api_sig"] = _signature(signed, shared_secret)
         body = {**signed, "format": "json"}
         return await asyncio.to_thread(self._post, body)
+
+    def _app_credentials(self) -> tuple[str, str]:
+        values = tuple(
+            str(self.context.get_secret(key) or "").strip()
+            for key in ("api_key", "shared_secret")
+        )
+        if not all(values):
+            raise ProviderError(
+                "AUTH_REQUIRED",
+                "Configura la API key y el shared secret de Last.fm.",
+            )
+        return values
 
     def _missing_credentials(self) -> list[str]:
         labels = {

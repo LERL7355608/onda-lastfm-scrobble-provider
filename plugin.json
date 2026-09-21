@@ -3,7 +3,7 @@
   "name": "Last.fm Scrobbler",
   "description": "Envía reproducciones y el estado actual a Last.fm.",
   "author": "ONDA",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "apiVersion": "1.0.0",
   "runtime": "python-v1",
   "entrypoint": "provider.py",
@@ -18,12 +18,18 @@
     "networkDomains": [
       "ws.audioscrobbler.com"
     ],
-    "loginOrigins": [],
+    "loginOrigins": [
+      "https://www.last.fm",
+      "https://secure.last.fm"
+    ],
     "secureStorageKeys": [
       "api_key",
       "shared_secret",
       "session_key"
     ]
+  },
+  "providerLogin": {
+    "buttonLabel": "Conectar con Last.fm"
   },
   "settings": [
     {
@@ -45,7 +51,8 @@
       "label": "Session key",
       "description": "Sesión autorizada de Last.fm para enviar scrobbles.",
       "type": "secret",
-      "required": true
+      "required": true,
+      "managedByAuth": true
     }
   ],
   "repository": "https://github.com/LERL7355608/onda-lastfm-scrobble-provider"
